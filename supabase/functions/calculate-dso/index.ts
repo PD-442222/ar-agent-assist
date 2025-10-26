@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
 
     const { data: outstandingInvoices, error: outstandingError } = await supabase
       .from('invoices')
-      .select('amount, due_date, created_at, tenant_id')
+      .select('amount, due_date, tenant_id')
       .eq('tenant_id', profile.tenant_id)
       .in('status', ['open', 'overdue', 'disputed']);
 
@@ -97,16 +97,9 @@ Deno.serve(async (req) => {
       if (!Number.isFinite(amount) || amount <= 0) continue;
 
       const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
-      const createdDate = invoice.created_at ? new Date(invoice.created_at) : null;
-      const referenceDate = dueDate && !isNaN(dueDate.getTime())
-        ? dueDate
-        : createdDate && !isNaN(createdDate.getTime())
-          ? createdDate
-          : null;
+      if (!dueDate || isNaN(dueDate.getTime())) continue;
 
-      if (!referenceDate) continue;
-
-      const daysOutstanding = Math.max(0, Math.floor((today.getTime() - referenceDate.getTime()) / MS_PER_DAY));
+      const daysOutstanding = Math.max(0, Math.floor((today.getTime() - dueDate.getTime()) / MS_PER_DAY));
       weightedOutstandingDays += daysOutstanding * amount;
       outstandingAmountTotal += amount;
     }
@@ -133,7 +126,6 @@ Deno.serve(async (req) => {
         invoices:matched_invoice_id (
           amount,
           due_date,
-          created_at,
           tenant_id
         )
       `)
@@ -158,12 +150,9 @@ Deno.serve(async (req) => {
 
       const paymentDate = payment.payment_date ? new Date(payment.payment_date) : null;
       const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
-      const createdDate = invoice.created_at ? new Date(invoice.created_at) : null;
+      if (!paymentDate || isNaN(paymentDate.getTime()) || !dueDate || isNaN(dueDate.getTime())) continue;
 
-      const startDate = createdDate && !isNaN(createdDate.getTime()) ? createdDate : dueDate;
-      if (!paymentDate || isNaN(paymentDate.getTime()) || !startDate || isNaN(startDate.getTime())) continue;
-
-      const daysToCollect = Math.max(0, Math.floor((paymentDate.getTime() - startDate.getTime()) / MS_PER_DAY));
+      const daysToCollect = Math.max(0, Math.floor((paymentDate.getTime() - dueDate.getTime()) / MS_PER_DAY));
       weightedPaymentDays += daysToCollect * amount;
       totalPaidAmount += amount;
     }
