@@ -1,8 +1,8 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 const parseNumeric = (value: unknown): number => {
@@ -136,13 +136,13 @@ const getErrorMessage = (error: unknown) =>
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     // Get authenticated user
-    const authHeader = req.headers.get('Authorization');
+    const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: 'Missing authorization header' }),
@@ -153,16 +153,19 @@ Deno.serve(async (req) => {
       );
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey, {
       global: {
-        headers: { Authorization: authHeader }
-      }
+        headers: { Authorization: authHeader },
+      },
     });
 
     // Get user's tenant_id
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
     if (userError || !user) {
       console.error('Error getting user:', userError);
       return new Response(
@@ -175,9 +178,9 @@ Deno.serve(async (req) => {
     }
 
     const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('tenant_id')
-      .eq('id', user.id)
+      .from("profiles")
+      .select("tenant_id")
+      .eq("id", user.id)
       .single();
 
     if (profileError || !profile) {
@@ -192,15 +195,15 @@ Deno.serve(async (req) => {
     }
 
     // Handle GET request - list all payments
-    if (req.method === 'GET') {
+    if (req.method === "GET") {
       const { data: payments, error: paymentsError } = await supabase
-        .from('payments')
-        .select('*')
-        .eq('tenant_id', profile.tenant_id)
-        .order('payment_date', { ascending: false });
+        .from("payments")
+        .select("*")
+        .eq("tenant_id", profile.tenant_id)
+        .order("payment_date", { ascending: false });
 
       if (paymentsError) {
-        console.error('Error fetching payments:', paymentsError);
+        console.error("Error fetching payments:", paymentsError);
         throw paymentsError;
       }
 
@@ -244,28 +247,32 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400 
         }
-      );
+      }
+    }
+
+    if (!payment_id) {
+      return new Response(JSON.stringify({ error: "payment_id is required" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
     }
 
     console.log(`Matching payment ${payment_id} (tenant: ${profile.tenant_id})`);
 
     // Fetch payment details filtered by tenant
     const { data: payment, error: paymentError } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('payment_id', payment_id)
-      .eq('tenant_id', profile.tenant_id)
+      .from("payments")
+      .select("*")
+      .eq("payment_id", payment_id)
+      .eq("tenant_id", profile.tenant_id)
       .single();
 
     if (paymentError || !payment) {
-      console.error('Error fetching payment:', paymentError);
-      return new Response(
-        JSON.stringify({ error: 'Payment not found' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 404 
-        }
-      );
+      console.error("Error fetching payment:", paymentError);
+      return new Response(JSON.stringify({ error: "Payment not found" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 404,
+      });
     }
 
     const paymentAmount = parseNumeric(payment.amount_received);
@@ -313,11 +320,11 @@ Deno.serve(async (req) => {
         .eq('tenant_id', profile.tenant_id);
 
       if (invoiceUpdateError) {
-        console.error('Error updating invoice:', invoiceUpdateError);
+        console.error("Error updating invoice:", invoiceUpdateError);
         throw invoiceUpdateError;
       }
     } else {
-      console.log('No exact match found - flagging for review');
+      console.log("No exact match found - flagging for review");
     }
 
     const { error: paymentUpdateError } = await supabase
@@ -330,7 +337,7 @@ Deno.serve(async (req) => {
       .eq('tenant_id', profile.tenant_id);
 
     if (paymentUpdateError) {
-      console.error('Error updating payment:', paymentUpdateError);
+      console.error("Error updating payment:", paymentUpdateError);
       throw paymentUpdateError;
     }
 
@@ -373,5 +380,11 @@ Deno.serve(async (req) => {
         status: 500
       }
     );
+  } catch (error: unknown) {
+    console.error("Function error:", error);
+    return new Response(JSON.stringify({ error: getErrorMessage(error) }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
   }
 });
