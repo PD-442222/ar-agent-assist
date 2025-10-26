@@ -1,0 +1,16 @@
+project_id = "trnyhhrptmeuuoxnqnzi"
+
+[functions.get-invoices]
+verify_jwt = false
+
+[functions.predict-risk]
+verify_jwt = false
+
+[functions.match-payments]
+verify_jwt = false
+
+[functions.disputes]
+verify_jwt = false
+
+[functions.calculate-dso]
+verify_jwt = false
