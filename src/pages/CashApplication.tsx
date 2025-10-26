@@ -46,6 +46,7 @@ const CashApplication = () => {
       }
 
       const { data, error } = await supabase.functions.invoke('match-payments', {
+        method: 'GET',
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },

@@ -85,12 +85,33 @@ Deno.serve(async (req) => {
     }
 
     // Handle POST request - match payment
-    const { payment_id } = await req.json();
+    const contentType = req.headers.get('content-type') || '';
+    let payment_id: string | undefined;
+
+    if (contentType.includes('application/json')) {
+      const bodyText = await req.text();
+
+      if (bodyText.trim().length > 0) {
+        try {
+          const body = JSON.parse(bodyText);
+          payment_id = body?.payment_id;
+        } catch (parseError) {
+          console.error('Invalid JSON payload:', parseError);
+          return new Response(
+            JSON.stringify({ error: 'Invalid JSON payload' }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400
+            }
+          );
+        }
+      }
+    }
 
     if (!payment_id) {
       return new Response(
         JSON.stringify({ error: 'payment_id is required' }),
-        { 
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400 
         }
@@ -148,7 +169,8 @@ Deno.serve(async (req) => {
       const { error: invoiceUpdateError } = await supabase
         .from('invoices')
         .update({ status: 'paid' })
-        .eq('invoice_id', matchedInvoice.invoice_id);
+        .eq('invoice_id', matchedInvoice.invoice_id)
+        .eq('tenant_id', profile.tenant_id);
 
       if (invoiceUpdateError) {
         console.error('Error updating invoice:', invoiceUpdateError);
@@ -161,11 +183,12 @@ Deno.serve(async (req) => {
     // Update payment status
     const { error: paymentUpdateError } = await supabase
       .from('payments')
-      .update({ 
+      .update({
         status: status,
         matched_invoice_id: matched_invoice_id
       })
-      .eq('payment_id', payment_id);
+      .eq('payment_id', payment_id)
+      .eq('tenant_id', profile.tenant_id);
 
     if (paymentUpdateError) {
       console.error('Error updating payment:', paymentUpdateError);
