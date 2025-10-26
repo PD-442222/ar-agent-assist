@@ -64,46 +64,126 @@ Deno.serve(async (req) => {
 
     console.log(`Calculating DSO for tenant: ${profile.tenant_id}`);
 
-    // Fetch all paid invoices for this tenant
-    const { data: paidInvoices, error: invoicesError } = await supabase
-      .from('invoices')
-      .select('due_date, created_at')
-      .eq('status', 'paid')
-      .eq('tenant_id', profile.tenant_id);
+    const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
-    if (invoicesError) {
-      console.error('Error fetching paid invoices:', invoicesError);
-      throw invoicesError;
+    const toNumber = (value: any): number => {
+      if (typeof value === 'number') return value;
+      if (typeof value === 'string') {
+        const parsed = parseFloat(value);
+        return Number.isFinite(parsed) ? parsed : 0;
+      }
+      return 0;
+    };
+
+    const { data: outstandingInvoices, error: outstandingError } = await supabase
+      .from('invoices')
+      .select('amount, due_date, tenant_id')
+      .eq('tenant_id', profile.tenant_id)
+      .in('status', ['open', 'overdue', 'disputed']);
+
+    if (outstandingError) {
+      console.error('Error fetching outstanding invoices:', outstandingError);
+      throw outstandingError;
     }
 
-    if (!paidInvoices || paidInvoices.length === 0) {
-      // No paid invoices, return 0
+    const today = new Date();
+    let weightedOutstandingDays = 0;
+    let outstandingAmountTotal = 0;
+
+    for (const invoice of outstandingInvoices || []) {
+      if (!invoice || invoice.tenant_id !== profile.tenant_id) continue;
+
+      const amount = toNumber(invoice.amount);
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+
+      const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
+      if (!dueDate || isNaN(dueDate.getTime())) continue;
+
+      const daysOutstanding = Math.max(0, Math.floor((today.getTime() - dueDate.getTime()) / MS_PER_DAY));
+      weightedOutstandingDays += daysOutstanding * amount;
+      outstandingAmountTotal += amount;
+    }
+
+    if (outstandingAmountTotal > 0 && weightedOutstandingDays > 0) {
+      const avgDSO = Math.round(weightedOutstandingDays / outstandingAmountTotal);
+      console.log(`DSO calculated from outstanding invoices: ${avgDSO} days across ${outstandingInvoices?.length || 0} invoices`);
+
       return new Response(
-        JSON.stringify({ dso: 0 }),
-        { 
+        JSON.stringify({ dso: avgDSO }),
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
+          status: 200
         }
       );
     }
 
-    // Calculate average days to payment
-    let totalDays = 0;
-    for (const invoice of paidInvoices) {
-      const dueDate = new Date(invoice.due_date);
-      const createdDate = new Date(invoice.created_at);
-      const daysDiff = Math.floor((dueDate.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
-      totalDays += Math.max(0, daysDiff);
+    const { data: matchedPayments, error: matchedPaymentsError } = await supabase
+      .from('payments')
+      .select(`
+        amount_received,
+        payment_date,
+        matched_invoice_id,
+        invoices:matched_invoice_id (
+          amount,
+          due_date,
+          tenant_id
+        )
+      `)
+      .eq('tenant_id', profile.tenant_id)
+      .eq('status', 'matched')
+      .not('matched_invoice_id', 'is', null);
+
+    if (matchedPaymentsError) {
+      console.error('Error fetching matched payments:', matchedPaymentsError);
+      throw matchedPaymentsError;
     }
 
-    const avgDSO = Math.round(totalDays / paidInvoices.length);
-    console.log(`DSO calculated: ${avgDSO} days (${paidInvoices.length} paid invoices)`);
+    let weightedPaymentDays = 0;
+    let totalPaidAmount = 0;
+
+    for (const payment of matchedPayments || []) {
+      const invoice = Array.isArray(payment.invoices) ? payment.invoices[0] : payment.invoices;
+      if (!invoice || invoice.tenant_id !== profile.tenant_id) continue;
+
+      const amount = toNumber(payment.amount_received ?? invoice.amount);
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+
+      const paymentDate = payment.payment_date ? new Date(payment.payment_date) : null;
+      const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
+      if (!paymentDate || isNaN(paymentDate.getTime()) || !dueDate || isNaN(dueDate.getTime())) continue;
+
+      const daysToCollect = Math.max(0, Math.floor((paymentDate.getTime() - dueDate.getTime()) / MS_PER_DAY));
+      weightedPaymentDays += daysToCollect * amount;
+      totalPaidAmount += amount;
+    }
+
+    if (totalPaidAmount > 0 && weightedPaymentDays > 0) {
+      const avgDSO = Math.round(weightedPaymentDays / totalPaidAmount);
+      console.log(`DSO calculated from matched payments: ${avgDSO} days across ${matchedPayments?.length || 0} payments`);
+
+      return new Response(
+        JSON.stringify({ dso: avgDSO }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
+        }
+      );
+    }
+
+    // As a final fallback, return a neutral baseline if invoices exist at all
+    const { count: invoiceCount } = await supabase
+      .from('invoices')
+      .select('invoice_id', { count: 'exact', head: true })
+      .eq('tenant_id', profile.tenant_id);
+
+    const fallbackDSO = invoiceCount && invoiceCount > 0 ? 35 : 0;
+    console.log(`DSO fallback engaged, returning ${fallbackDSO}`);
 
     return new Response(
-      JSON.stringify({ dso: avgDSO }),
-      { 
+      JSON.stringify({ dso: fallbackDSO }),
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200 
+        status: 200
       }
     );
 

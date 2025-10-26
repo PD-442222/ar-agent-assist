@@ -6,9 +6,11 @@ import { FileText, MessageSquare, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+type DisputeStatus = "new" | "in-review" | "awaiting-customer" | "resolved";
+
 interface Dispute {
   dispute_id: string;
-  status: "new" | "in-review" | "awaiting-customer" | "resolved";
+  status: DisputeStatus;
   disputed_amount: number;
   reason: string | null;
   created_at: string;
@@ -27,15 +29,48 @@ const DisputeManagement = () => {
     fetchDisputes();
   }, []);
 
+  const normalizeStatus = (status: string): DisputeStatus => {
+    const normalized = status.toLowerCase().replace(/_/g, "-");
+    switch (normalized) {
+      case "in-review":
+        return "in-review";
+      case "awaiting-customer":
+        return "awaiting-customer";
+      case "resolved":
+        return "resolved";
+      default:
+        return "new";
+    }
+  };
+
   const fetchDisputes = async () => {
     try {
       setIsLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to view disputes",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('disputes', {
         method: 'GET',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       if (error) throw error;
-      setDisputes(data || []);
+      const normalizedDisputes: Dispute[] = (data || []).map((dispute: any) => ({
+        ...dispute,
+        status: normalizeStatus(dispute.status),
+      }));
+
+      setDisputes(normalizedDisputes);
     } catch (error: any) {
       console.error('Error fetching disputes:', error);
       toast({
@@ -48,7 +83,7 @@ const DisputeManagement = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: DisputeStatus) => {
     switch (status) {
       case "new":
         return "bg-danger text-danger-foreground";
@@ -63,7 +98,7 @@ const DisputeManagement = () => {
     }
   };
 
-  const getStatusLabel = (status: string) => {
+  const getStatusLabel = (status: DisputeStatus) => {
     return status.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
   };
 
@@ -106,76 +141,79 @@ const DisputeManagement = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {Object.entries(groupedDisputes).map(([status, items]) => (
-            <div key={status} className="space-y-3">
-              <Card className="p-4 bg-gradient-card shadow-card">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">{getStatusLabel(status)}</h3>
-                  <Badge variant="secondary">{items.length}</Badge>
-                </div>
-              </Card>
+          {Object.entries(groupedDisputes).map(([status, items]) => {
+            const typedStatus = status as DisputeStatus;
+            return (
+              <div key={status} className="space-y-3">
+                <Card className="p-4 bg-gradient-card shadow-card">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold">{getStatusLabel(typedStatus)}</h3>
+                    <Badge variant="secondary">{items.length}</Badge>
+                  </div>
+                </Card>
 
-              <div className="space-y-3">
-                {items.length === 0 ? (
-                  <Card className="p-4 bg-card shadow-card">
-                    <p className="text-sm text-muted-foreground text-center">No disputes</p>
-                  </Card>
-                ) : (
-                  items.map((dispute) => (
-                    <Card
-                      key={dispute.dispute_id}
-                      className="p-4 bg-card shadow-card hover:shadow-elevated transition-all duration-300 cursor-move"
-                      draggable
-                    >
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-sm">{dispute.dispute_id.slice(0, 13)}...</span>
-                          <Badge className={getStatusColor(dispute.status)} variant="secondary">
-                            {getStatusLabel(dispute.status)}
-                          </Badge>
-                        </div>
-
-                        <div>
-                          <p className="font-semibold">{dispute.customer_name}</p>
-                          <p className="text-sm text-muted-foreground">{dispute.invoice_number}</p>
-                        </div>
-
-                        <div className="bg-danger-muted rounded-lg p-3">
-                          <div className="flex items-center justify-between text-sm mb-1">
-                            <span className="text-muted-foreground">Invoice Amount:</span>
-                            <span className="font-medium">${parseFloat(dispute.invoice_amount.toString()).toLocaleString()}</span>
+                <div className="space-y-3">
+                  {items.length === 0 ? (
+                    <Card className="p-4 bg-card shadow-card">
+                      <p className="text-sm text-muted-foreground text-center">No disputes</p>
+                    </Card>
+                  ) : (
+                    items.map((dispute) => (
+                      <Card
+                        key={dispute.dispute_id}
+                        className="p-4 bg-card shadow-card hover:shadow-elevated transition-all duration-300 cursor-move"
+                        draggable
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-sm">{dispute.dispute_id.slice(0, 13)}...</span>
+                            <Badge className={getStatusColor(dispute.status)} variant="secondary">
+                              {getStatusLabel(dispute.status)}
+                            </Badge>
                           </div>
-                          <div className="flex items-center justify-between text-sm pt-2 border-t border-danger">
-                            <span className="font-semibold">Disputed Amount:</span>
-                            <span className="font-bold text-danger">${parseFloat(dispute.disputed_amount.toString()).toLocaleString()}</span>
-                          </div>
-                        </div>
 
-                        {dispute.reason && (
-                          <div className="text-sm text-muted-foreground bg-muted/50 rounded p-2">
-                            <div className="flex items-start gap-2">
-                              <MessageSquare className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                              <span>{dispute.reason}</span>
+                          <div>
+                            <p className="font-semibold">{dispute.customer_name}</p>
+                            <p className="text-sm text-muted-foreground">{dispute.invoice_number}</p>
+                          </div>
+
+                          <div className="bg-danger-muted rounded-lg p-3">
+                            <div className="flex items-center justify-between text-sm mb-1">
+                              <span className="text-muted-foreground">Invoice Amount:</span>
+                              <span className="font-medium">${parseFloat(dispute.invoice_amount.toString()).toLocaleString()}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm pt-2 border-t border-danger">
+                              <span className="font-semibold">Disputed Amount:</span>
+                              <span className="font-bold text-danger">${parseFloat(dispute.disputed_amount.toString()).toLocaleString()}</span>
                             </div>
                           </div>
-                        )}
 
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" className="flex-1">
-                            <FileText className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
-                          <Button size="sm" className="flex-1 bg-gradient-primary">
-                            Update
-                          </Button>
+                          {dispute.reason && (
+                            <div className="text-sm text-muted-foreground bg-muted/50 rounded p-2">
+                              <div className="flex items-start gap-2">
+                                <MessageSquare className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                                <span>{dispute.reason}</span>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" className="flex-1">
+                              <FileText className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                            <Button size="sm" className="flex-1 bg-gradient-primary">
+                              Update
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    </Card>
-                  ))
-                )}
+                      </Card>
+                    ))
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
