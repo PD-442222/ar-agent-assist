@@ -72,7 +72,7 @@ const DisputeManagement = () => {
 
       setDisputes(normalizedDisputes);
     } catch (error: any) {
-      console.error('Error fetching disputes:', error);
+      console.error("Error fetching disputes:", error);
       toast({
         title: "Error",
         description: "Failed to load disputes",
@@ -103,10 +103,10 @@ const DisputeManagement = () => {
   };
 
   const groupedDisputes = {
-    new: disputes.filter(d => d.status === "new"),
-    "in-review": disputes.filter(d => d.status === "in-review"),
-    "awaiting-customer": disputes.filter(d => d.status === "awaiting-customer"),
-    resolved: disputes.filter(d => d.status === "resolved"),
+    new: disputes.filter((d) => d.status === "new"),
+    "in-review": disputes.filter((d) => d.status === "in-review"),
+    "awaiting-customer": disputes.filter((d) => d.status === "awaiting-customer"),
+    resolved: disputes.filter((d) => d.status === "resolved"),
   };
 
   if (isLoading) {
@@ -114,9 +114,7 @@ const DisputeManagement = () => {
       <div className="min-h-screen bg-background">
         <div className="container mx-auto p-6 space-y-6">
           <div>
-            <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              Dispute Management
-            </h1>
+            <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">Dispute Management</h1>
             <p className="text-muted-foreground mt-1">Track and resolve payment discrepancies</p>
           </div>
           <Card className="p-8 bg-gradient-card shadow-card">
@@ -134,9 +132,7 @@ const DisputeManagement = () => {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-6 space-y-6">
         <div>
-          <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            Dispute Management
-          </h1>
+          <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">Dispute Management</h1>
           <p className="text-muted-foreground mt-1">Track and resolve payment discrepancies</p>
         </div>
 
