@@ -64,40 +64,92 @@ Deno.serve(async (req) => {
 
     console.log(`Calculating DSO for tenant: ${profile.tenant_id}`);
 
-    // Fetch all paid invoices for this tenant
-    const { data: paidInvoices, error: invoicesError } = await supabase
-      .from('invoices')
-      .select('due_date, created_at')
-      .eq('status', 'paid')
-      .eq('tenant_id', profile.tenant_id);
+    const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
-    if (invoicesError) {
-      console.error('Error fetching paid invoices:', invoicesError);
-      throw invoicesError;
+    const { data: matchedPayments, error: matchedPaymentsError } = await supabase
+      .from('payments')
+      .select(`
+        payment_date,
+        matched_invoice_id,
+        invoices:matched_invoice_id (
+          invoice_id,
+          created_at,
+          tenant_id
+        )
+      `)
+      .eq('tenant_id', profile.tenant_id)
+      .eq('status', 'matched')
+      .not('matched_invoice_id', 'is', null);
+
+    if (matchedPaymentsError) {
+      console.error('Error fetching matched payments:', matchedPaymentsError);
+      throw matchedPaymentsError;
     }
 
-    if (!paidInvoices || paidInvoices.length === 0) {
-      // No paid invoices, return 0
+    const paidDurations: number[] = (matchedPayments || [])
+      .map((payment: any) => {
+        const invoice = Array.isArray(payment.invoices) ? payment.invoices[0] : payment.invoices;
+        if (!invoice || invoice.tenant_id !== profile.tenant_id) {
+          return null;
+        }
+
+        const paymentDate = new Date(payment.payment_date);
+        const issuedDate = new Date(invoice.created_at);
+
+        if (isNaN(paymentDate.getTime()) || isNaN(issuedDate.getTime())) {
+          return null;
+        }
+
+        const diff = Math.round((paymentDate.getTime() - issuedDate.getTime()) / MS_PER_DAY);
+        return Math.max(0, diff);
+      })
+      .filter((value): value is number => value !== null && Number.isFinite(value));
+
+    const { data: outstandingInvoices, error: outstandingError } = await supabase
+      .from('invoices')
+      .select('created_at, status, tenant_id')
+      .eq('tenant_id', profile.tenant_id)
+      .in('status', ['open', 'overdue', 'disputed']);
+
+    if (outstandingError) {
+      console.error('Error fetching outstanding invoices:', outstandingError);
+      throw outstandingError;
+    }
+
+    const today = new Date();
+    const outstandingDurations: number[] = (outstandingInvoices || [])
+      .map((invoice: any) => {
+        if (invoice.tenant_id !== profile.tenant_id) {
+          return null;
+        }
+
+        const createdDate = new Date(invoice.created_at);
+        if (isNaN(createdDate.getTime())) {
+          return null;
+        }
+
+        const diff = Math.round((today.getTime() - createdDate.getTime()) / MS_PER_DAY);
+        return Math.max(0, diff);
+      })
+      .filter((value): value is number => value !== null && Number.isFinite(value));
+
+    const durations = paidDurations.length > 0
+      ? paidDurations.concat(outstandingDurations)
+      : outstandingDurations;
+
+    if (durations.length === 0) {
       return new Response(
         JSON.stringify({ dso: 0 }),
-        { 
+        {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
+          status: 200
         }
       );
     }
 
-    // Calculate average days to payment
-    let totalDays = 0;
-    for (const invoice of paidInvoices) {
-      const dueDate = new Date(invoice.due_date);
-      const createdDate = new Date(invoice.created_at);
-      const daysDiff = Math.floor((dueDate.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
-      totalDays += Math.max(0, daysDiff);
-    }
-
-    const avgDSO = Math.round(totalDays / paidInvoices.length);
-    console.log(`DSO calculated: ${avgDSO} days (${paidInvoices.length} paid invoices)`);
+    const totalDays = durations.reduce((sum, value) => sum + value, 0);
+    const avgDSO = Math.round(totalDays / durations.length);
+    console.log(`DSO calculated: ${avgDSO} days from ${durations.length} records`);
 
     return new Response(
       JSON.stringify({ dso: avgDSO }),

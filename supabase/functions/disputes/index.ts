@@ -5,6 +5,25 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+type NormalizedStatus = 'new' | 'in-review' | 'awaiting-customer' | 'resolved';
+
+const normalizeStatus = (status: string | null): NormalizedStatus => {
+  if (!status) return 'new';
+  const formatted = status.toLowerCase().replace(/_/g, '-');
+  if (formatted === 'in-review') return 'in-review';
+  if (formatted === 'awaiting-customer') return 'awaiting-customer';
+  if (formatted === 'resolved') return 'resolved';
+  return 'new';
+};
+
+const denormalizeStatus = (status: string): string => {
+  const formatted = status.toLowerCase().replace(/-/g, '_');
+  if (['new', 'in_review', 'awaiting_customer', 'resolved'].includes(formatted)) {
+    return formatted;
+  }
+  return 'new';
+};
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -98,7 +117,7 @@ Deno.serve(async (req) => {
 
       const formattedDisputes = disputes.map((dispute: any) => ({
         dispute_id: dispute.dispute_id,
-        status: dispute.status,
+        status: normalizeStatus(dispute.status),
         disputed_amount: parseFloat(dispute.disputed_amount),
         reason: dispute.reason,
         created_at: dispute.created_at,
@@ -213,7 +232,7 @@ Deno.serve(async (req) => {
       console.log(`Updating dispute ${dispute_id} (tenant: ${profile.tenant_id})`);
 
       const updateData: any = {};
-      if (status) updateData.status = status;
+      if (status) updateData.status = denormalizeStatus(status);
       if (reason !== undefined) updateData.reason = reason;
 
       const { data: dispute, error: updateError } = await supabase
