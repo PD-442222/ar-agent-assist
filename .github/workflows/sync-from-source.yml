@@ -1,0 +1,88 @@
+name: Sync from source via PR
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 */6 * * *"   # every 6 hours; adjust or delete the schedule if not needed
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      # 1) Check out DESTINATION repo (this repo) so we can push a branch here
+      - name: Checkout destination
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2) Check out SOURCE repo (private) into a subfolder using the read-only PAT
+      - name: Checkout source (private)
+        uses: actions/checkout@v4
+        with:
+          repository: Priyadashi/ar-agent-assist   # ← your source repo
+          ref: main                                # ← change if your source default branch differs
+          token: ${{ secrets.SOURCE_REPO_PAT }}
+          path: source
+
+      # 3) Copy source → destination working tree (keep this repo's .github, and skip .env)
+      - name: Copy files from source into destination working tree
+        shell: bash
+        run: |
+          set -e
+          # Keep .git and .github in destination; remove everything else at the top level
+          find . -mindepth 1 -maxdepth 1 ! -name .git ! -name .github -exec rm -rf {} +
+
+          # Copy all top-level files/dirs from source except .git, .github, and .env
+          shopt -s dotglob
+          for p in source/*; do
+            name="$(basename "$p")"
+            case "$name" in
+              .git|.github|.env) continue;;
+            esac
+            cp -R "$p" .
+          done
+
+      # 4) Create/Update a sync branch with the changes
+      - name: Commit changes to sync branch
+        shell: bash
+        run: |
+          set -e
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git checkout -B incoming-sync
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Sync: update from source (Priyadashi/ar-agent-assist)"
+          fi
+          git push origin incoming-sync
+
+      # 5) Open or update a PR from incoming-sync → main
+      - name: Open or update PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const head = "incoming-sync";
+            const base = "main";
+
+            const { data: prs } = await github.rest.pulls.list({
+              owner, repo, state: "open", head: `${owner}:${head}`, base
+            });
+
+            if (prs.length === 0) {
+              await github.rest.pulls.create({
+                owner, repo, head, base,
+                title: "Sync from source (Priyadashi/ar-agent-assist → PD-442222/ar-agent-assist)",
+                body: "Automated PR to replicate the private source into this repository."
+              });
+              core.info("Created PR from incoming-sync → main");
+            } else {
+              core.info("PR already open; nothing to do.");
+            }
