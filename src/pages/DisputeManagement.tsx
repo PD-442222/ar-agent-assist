@@ -30,9 +30,7 @@ const DisputeManagement = () => {
   const fetchDisputes = async () => {
     try {
       setIsLoading(true);
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
         toast({
@@ -43,8 +41,8 @@ const DisputeManagement = () => {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke("disputes", {
-        method: "GET",
+      const { data, error } = await supabase.functions.invoke('disputes', {
+        method: 'GET',
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },

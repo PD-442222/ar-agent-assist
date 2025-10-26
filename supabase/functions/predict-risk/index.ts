@@ -152,14 +152,14 @@ Deno.serve(async (req) => {
 
     // Update the invoice with risk score and explanation
     const { data: updatedInvoices, error: updateError } = await supabase
-      .from("invoices")
+      .from('invoices')
       .update({
         risk_score: risk_score,
         risk_explanation: risk_explanation,
       })
-      .eq("invoice_id", invoice_id)
-      .eq("tenant_id", profile.tenant_id)
-      .select("invoice_id");
+      .eq('invoice_id', invoice_id)
+      .eq('tenant_id', profile.tenant_id)
+      .select('invoice_id');
 
     if (updateError) {
       console.error("Error updating invoice:", updateError);
@@ -167,14 +167,17 @@ Deno.serve(async (req) => {
     }
 
     if (!updatedInvoices || updatedInvoices.length === 0) {
-      console.error("No invoice updated for tenant:", profile.tenant_id);
-      return new Response(JSON.stringify({ error: "Invoice not found" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 404,
-      });
+      console.error('No invoice updated for tenant:', profile.tenant_id);
+      return new Response(
+        JSON.stringify({ error: 'Invoice not found' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 404
+        }
+      );
     }
 
-    console.log("Successfully updated invoice with risk prediction");
+    console.log('Successfully updated invoice with risk prediction');
 
     return new Response(
       JSON.stringify({
