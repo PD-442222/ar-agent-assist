@@ -11,14 +11,7 @@ import {
 import { Loader2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface Payment {
   payment_id: string;
@@ -160,8 +153,10 @@ const CashApplication = () => {
   const handleMatchPayment = async (paymentId: string) => {
     try {
       setMatchingPaymentId(paymentId);
-      const { data: { session } } = await supabase.auth.getSession();
-      
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       if (!session) {
         toast({
           title: "Authentication required",
@@ -233,9 +228,7 @@ const CashApplication = () => {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-6 space-y-6">
         <div>
-          <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            Cash Application
-          </h1>
+          <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">Cash Application</h1>
           <p className="text-muted-foreground mt-1">Payment Records</p>
         </div>
 
@@ -283,13 +276,15 @@ const CashApplication = () => {
                           {payment.status}
                         </span>
                       </TableCell>
-                      <TableCell>{payment.matched_invoice_id ? payment.matched_invoice_id.slice(0, 8) + '...' : '-'}</TableCell>
+                      <TableCell>
+                        {payment.matched_invoice_id ? payment.matched_invoice_id.slice(0, 8) + "..." : "-"}
+                      </TableCell>
                       <TableCell>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleMatchPayment(payment.payment_id)}
-                          disabled={matchingPaymentId === payment.payment_id || payment.status === 'matched'}
+                          disabled={matchingPaymentId === payment.payment_id || payment.status === "matched"}
                         >
                           {matchingPaymentId === payment.payment_id ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
