@@ -1,13 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -108,13 +102,14 @@ const CashApplication = () => {
     return Number.isNaN(parsed) ? undefined : parsed;
   };
 
-  const getErrorMessage = (error: unknown) =>
-    error instanceof Error ? error.message : 'Unexpected error occurred';
+  const getErrorMessage = (error: unknown) => (error instanceof Error ? error.message : "Unexpected error occurred");
 
   const fetchPayments = useCallback(async () => {
     try {
       setIsLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
       if (!session) {
         toast({
@@ -125,8 +120,8 @@ const CashApplication = () => {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke<Payment[]>('match-payments', {
-        method: 'GET',
+      const { data, error } = await supabase.functions.invoke<Payment[]>("match-payments", {
+        method: "GET",
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -135,7 +130,7 @@ const CashApplication = () => {
       if (error) throw error;
       setPayments(data ?? []);
     } catch (error: unknown) {
-      console.error('Error fetching payments:', error);
+      console.error("Error fetching payments:", error);
       toast({
         title: "Error",
         description: "Failed to load payments",
@@ -166,7 +161,7 @@ const CashApplication = () => {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke<MatchFunctionResponse>('match-payments', {
+      const { data, error } = await supabase.functions.invoke<MatchFunctionResponse>("match-payments", {
         body: { payment_id: paymentId },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -205,20 +200,20 @@ const CashApplication = () => {
         setIsResultDialogOpen(true);
 
         toast({
-          title: data.status === 'matched' ? "Match complete" : "Manual review suggested",
+          title: data.status === "matched" ? "Match complete" : "Manual review suggested",
           description: data.message || "Payment processed",
         });
       }
 
       // Refresh payments list
       await fetchPayments();
-      } catch (error: unknown) {
-        console.error('Error matching payment:', error);
-        toast({
-          title: "Error",
-          description: getErrorMessage(error) || "Failed to match payment",
-          variant: "destructive",
-        });
+    } catch (error: unknown) {
+      console.error("Error matching payment:", error);
+      toast({
+        title: "Error",
+        description: getErrorMessage(error) || "Failed to match payment",
+        variant: "destructive",
+      });
     } finally {
       setMatchingPaymentId(null);
     }
@@ -266,13 +261,15 @@ const CashApplication = () => {
                       <TableCell>${parseFloat(payment.amount_received.toString()).toLocaleString()}</TableCell>
                       <TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
                       <TableCell>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          payment.status === 'matched'
-                            ? 'bg-success/10 text-success'
-                            : payment.status === 'unmatched'
-                            ? 'bg-warning/10 text-warning'
-                            : 'bg-muted/10 text-muted-foreground'
-                        }`}>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            payment.status === "matched"
+                              ? "bg-success/10 text-success"
+                              : payment.status === "unmatched"
+                                ? "bg-warning/10 text-warning"
+                                : "bg-muted/10 text-muted-foreground"
+                          }`}
+                        >
                           {payment.status}
                         </span>
                       </TableCell>
@@ -313,13 +310,11 @@ const CashApplication = () => {
                 ? [
                     `Payment ${matchResult.paymentId.slice(0, 8)}...`,
                     formatCurrency(matchResult.paymentAmount),
-                    matchResult.paymentDate
-                      ? new Date(matchResult.paymentDate).toLocaleDateString()
-                      : undefined,
+                    matchResult.paymentDate ? new Date(matchResult.paymentDate).toLocaleDateString() : undefined,
                   ]
                     .filter((part): part is string => Boolean(part))
-                    .join(' • ')
-                : 'Review auto-matched and suggested invoices.'}
+                    .join(" • ")
+                : "Review auto-matched and suggested invoices."}
             </DialogDescription>
           </DialogHeader>
 
@@ -344,7 +339,9 @@ const CashApplication = () => {
                   ))
                 ) : (
                   <Card>
-                    <div className="p-4 text-sm text-muted-foreground">No automatic matches were found for this payment.</div>
+                    <div className="p-4 text-sm text-muted-foreground">
+                      No automatic matches were found for this payment.
+                    </div>
                   </Card>
                 )}
               </div>
@@ -353,7 +350,9 @@ const CashApplication = () => {
             <div className="space-y-4">
               <div>
                 <h3 className="text-lg font-semibold">Suggested for manual matching</h3>
-                <p className="text-sm text-muted-foreground">Potential invoice combinations ranked by similarity for analyst review.</p>
+                <p className="text-sm text-muted-foreground">
+                  Potential invoice combinations ranked by similarity for analyst review.
+                </p>
               </div>
               <div className="space-y-3">
                 {matchResult?.partialMatches.length ? (
@@ -362,7 +361,9 @@ const CashApplication = () => {
                       <div className="p-4 space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-muted-foreground">{suggestion.reason}</span>
-                          <span className="text-xs font-semibold text-primary">Confidence {Math.round(suggestion.confidence)}%</span>
+                          <span className="text-xs font-semibold text-primary">
+                            Confidence {Math.round(suggestion.confidence)}%
+                          </span>
                         </div>
                         <div className="space-y-2">
                           {suggestion.invoices.map((invoice) => (
@@ -380,10 +381,10 @@ const CashApplication = () => {
                           <span>Variance</span>
                           <span>
                             {suggestion.difference === 0
-                              ? 'Exact amount'
+                              ? "Exact amount"
                               : suggestion.difference > 0
-                              ? `${formatCurrency(suggestion.difference)} remaining`
-                              : `${formatCurrency(Math.abs(suggestion.difference))} over`}
+                                ? `${formatCurrency(suggestion.difference)} remaining`
+                                : `${formatCurrency(Math.abs(suggestion.difference))} over`}
                           </span>
                         </div>
                       </div>
@@ -391,7 +392,9 @@ const CashApplication = () => {
                   ))
                 ) : (
                   <Card>
-                    <div className="p-4 text-sm text-muted-foreground">No close invoice combinations were identified. Consider manual reconciliation.</div>
+                    <div className="p-4 text-sm text-muted-foreground">
+                      No close invoice combinations were identified. Consider manual reconciliation.
+                    </div>
                   </Card>
                 )}
               </div>
