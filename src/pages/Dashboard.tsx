@@ -61,9 +61,12 @@ const Dashboard = () => {
         const today = new Date();
         const daysOverdue = Math.max(0, Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
         
+        // Backend returns risk_score in 0-1 range, convert to 0-100 for display
+        const riskScorePercent = (inv.risk_score || 0) * 100;
+        
         let riskLevel: "high" | "medium" | "low" = "low";
-        if (inv.risk_score >= 70) riskLevel = "high";
-        else if (inv.risk_score >= 40) riskLevel = "medium";
+        if (inv.risk_score >= 0.7) riskLevel = "high";
+        else if (inv.risk_score >= 0.4) riskLevel = "medium";
 
         return {
           id: inv.invoice_id,
@@ -71,7 +74,7 @@ const Dashboard = () => {
           amount: inv.amount,
           dueDate: inv.due_date,
           riskLevel,
-          riskScore: inv.risk_score || 0,
+          riskScore: riskScorePercent,
           daysOverdue,
           invoiceNumber: inv.invoice_number,
           riskExplanation: inv.risk_explanation,
