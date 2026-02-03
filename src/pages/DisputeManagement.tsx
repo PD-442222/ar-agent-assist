@@ -46,7 +46,9 @@ const DisputeManagement = () => {
   const fetchDisputes = async () => {
     try {
       setIsLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
       if (!session) {
         toast({
@@ -57,8 +59,8 @@ const DisputeManagement = () => {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('disputes', {
-        method: 'GET',
+      const { data, error } = await supabase.functions.invoke("disputes", {
+        method: "GET",
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -99,7 +101,10 @@ const DisputeManagement = () => {
   };
 
   const getStatusLabel = (status: DisputeStatus) => {
-    return status.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+    return status
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
   };
 
   const groupedDisputes = {
@@ -176,11 +181,15 @@ const DisputeManagement = () => {
                           <div className="bg-danger-muted rounded-lg p-3">
                             <div className="flex items-center justify-between text-sm mb-1">
                               <span className="text-muted-foreground">Invoice Amount:</span>
-                              <span className="font-medium">${parseFloat(dispute.invoice_amount.toString()).toLocaleString()}</span>
+                              <span className="font-medium">
+                                ${parseFloat(dispute.invoice_amount.toString()).toLocaleString()}
+                              </span>
                             </div>
                             <div className="flex items-center justify-between text-sm pt-2 border-t border-danger">
                               <span className="font-semibold">Disputed Amount:</span>
-                              <span className="font-bold text-danger">${parseFloat(dispute.disputed_amount.toString()).toLocaleString()}</span>
+                              <span className="font-bold text-danger">
+                                ${parseFloat(dispute.disputed_amount.toString()).toLocaleString()}
+                              </span>
                             </div>
                           </div>
 
